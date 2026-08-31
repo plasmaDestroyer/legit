@@ -6,6 +6,7 @@
 #define PATH_MAX 4096
 #endif
 
+#include <openssl/sha.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -193,6 +194,129 @@ static int command_cat_file(const char *flag, const char *blob_sha) {
     return 0;
 }
 
+static int command_hash_object(const char *flag, const char *file_name) {
+    if (!streq(flag, "-w")) {
+        fprintf(stderr, "Usage: ./your_program.sh hash-object -w <file_name>\n");
+        return 1;
+    }
+
+    FILE *file = fopen(file_name, "rb");
+    if (!file) {
+        fprintf(stderr, "Error opening %s: %s\n", file_name, strerror(errno));
+        return 1;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fprintf(stderr, "fseek failed: %s\n", strerror(errno));
+        fclose(file);
+        return 1;
+    }
+    long sz = ftell(file);
+    if (sz < 0) {
+        fprintf(stderr, "ftell failed: %s\n", strerror(errno));
+        fclose(file);
+        return 1;
+    }
+    size_t content_len = (size_t)sz;
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        fprintf(stderr, "fseek failed: %s\n", strerror(errno));
+        fclose(file);
+        return 1;
+    }
+
+    unsigned char *content = (unsigned char *)malloc(content_len ? content_len : 1);
+    if (content_len > 0 && !content) {
+        fprintf(stderr, "Failed to allocate memory\n");
+        fclose(file);
+        return 1;
+    }
+
+    size_t bytes_read = fread(content, 1, content_len, file);
+    if (bytes_read != content_len) {
+        fprintf(stderr, "Error reading file: %s\n", ferror(file) ? strerror(errno) : "short read");
+        free(content);
+        fclose(file);
+        return 1;
+    }
+
+    fclose(file);
+
+    char header[32];
+    int n = snprintf(header, sizeof(header), "blob %zu", content_len);
+    if (n < 0 || n >= sizeof(header)) {
+        fprintf(stderr, "Error writing header\n");
+        free(content);
+        return 1;
+    }
+    size_t header_len = (size_t)n + 1;
+    size_t buf_len = header_len+content_len;
+
+    unsigned char *buf = (unsigned char *)malloc(buf_len);
+    if (!buf) {
+        fprintf(stderr, "Failed to allocate memory\n");
+        free(content);
+        return 1;
+    }
+
+    memcpy(buf, header, header_len);
+    memcpy(buf+header_len, content, content_len);
+
+    free(content);
+
+    unsigned char hash[SHA_DIGEST_LENGTH];
+    SHA1(buf, buf_len, hash);
+
+    char hex[SHA_DIGEST_LENGTH*2+1];
+    for (int i = 0; i < 20; ++i) snprintf(&hex[i*2], 3, "%02x", hash[i]);
+    hex[SHA_DIGEST_LENGTH*2] = '\0';
+
+    printf("%s\n", hex);
+
+    unsigned long compressed_len = compressBound((unsigned long)buf_len);
+    unsigned char *compressed_data = (unsigned char *)malloc(compressed_len);
+    if (!compressed_data) {
+        fprintf(stderr, "Failed to allocate memory\n");
+        free(buf);
+        return 1;
+    }
+
+    int zret = compress(compressed_data, &compressed_len, buf, buf_len);
+    if (zret != Z_OK) {
+        fprintf(stderr, "compress failed: %s\n", zError(zret));
+        free(buf);
+        free(compressed_data);
+        return 1;
+    }
+
+    char object_dir[PATH_MAX];
+    snprintf(object_dir, sizeof(object_dir), ".git/objects/%.2s", hex);
+    if (make_dir(object_dir) != 0) {
+        fprintf(stderr, "Error making object directory\n");
+        return 1;
+    }
+
+    char object_file_path[PATH_MAX];
+    snprintf(object_file_path, sizeof(object_file_path), "%s/%s", object_dir, (hex+2));
+
+    FILE *object_file = fopen(object_file_path, "wb");
+    if (!object_file) {
+        fprintf(stderr, "Error opening %s: %s\n", object_file_path, strerror(errno));
+        return 1;
+    }
+
+    if (fwrite(compressed_data, 1, compressed_len, object_file) != compressed_len) {
+        perror("fwrite");
+        free(buf);
+        free(compressed_data);
+        return 1;
+    }
+
+    fclose(object_file);
+    free(buf);
+    free(compressed_data);
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     // Disable output buffering
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -212,6 +336,10 @@ int main(int argc, char *argv[]) {
     } else if (streq(command, "cat-file")) {
         if (argc != 4) return EXIT_FAILURE;
         return command_cat_file(argv[2], argv[3]) ? EXIT_FAILURE : EXIT_SUCCESS;
+
+    } else if (streq(command, "hash-object")) {
+        if (argc != 4) return EXIT_FAILURE;
+        return command_hash_object(argv[2], argv[3]) ? EXIT_FAILURE : EXIT_SUCCESS;
 
     } else {
         fprintf(stderr, "Unknown command %s\n", command);
