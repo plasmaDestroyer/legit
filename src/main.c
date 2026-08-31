@@ -2,6 +2,7 @@
 #include <errno.h>
 
 #include <limits.h>
+#include <unistd.h>
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
@@ -272,6 +273,21 @@ static int command_hash_object(const char *flag, const char *file_name) {
 
     printf("%s\n", hex);
 
+    char object_dir[PATH_MAX];
+    snprintf(object_dir, sizeof(object_dir), ".git/objects/%.2s", hex);
+    if (make_dir(object_dir) != 0) {
+        fprintf(stderr, "Error making object directory\n");
+        return 1;
+    }
+
+    char object_file_path[PATH_MAX];
+    snprintf(object_file_path, sizeof(object_file_path), "%s/%s", object_dir, (hex+2));
+
+    if (access(object_file_path, F_OK) == 0) {
+        free(buf);
+        return 0;
+    }
+
     unsigned long compressed_len = compressBound((unsigned long)buf_len);
     unsigned char *compressed_data = (unsigned char *)malloc(compressed_len);
     if (!compressed_data) {
@@ -287,16 +303,6 @@ static int command_hash_object(const char *flag, const char *file_name) {
         free(compressed_data);
         return 1;
     }
-
-    char object_dir[PATH_MAX];
-    snprintf(object_dir, sizeof(object_dir), ".git/objects/%.2s", hex);
-    if (make_dir(object_dir) != 0) {
-        fprintf(stderr, "Error making object directory\n");
-        return 1;
-    }
-
-    char object_file_path[PATH_MAX];
-    snprintf(object_file_path, sizeof(object_file_path), "%s/%s", object_dir, (hex+2));
 
     FILE *object_file = fopen(object_file_path, "wb");
     if (!object_file) {
