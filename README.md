@@ -21,12 +21,12 @@ cmake -B build -S . && cmake --build ./build
 ./build/git hash-object -w <file>
 
 # alias for testing
-alias mygit=/path/to/le-git/your_program.sh
+alias le-git=/path/to/le-git/your_program.sh
 mkdir -p /tmp/testing && cd /tmp/testing
-mygit init
+le-git init
 echo "hello world" > test.txt
-mygit hash-object -w test.txt
-mygit cat-file -p <sha>
+le-git hash-object -w test.txt
+le-git cat-file -p <sha>
 ```
 
 ## Testing locally
