@@ -1,6 +1,6 @@
-# le-git - Build Your Own Git in C
+# legit - Build Your Own Git in C
 
-> Based on [CodeCrafters "Build Your Own Git" Challenge](https://codecrafters.io/challenges/git) - original template by [CodeCrafters](https://codecrafters.io). Rebuilt and extended as `le-git`.
+> Based on [CodeCrafters "Build Your Own Git" Challenge](https://codecrafters.io/challenges/git) - original template by [CodeCrafters](https://codecrafters.io). Rebuilt and extended as `legit`.
 
 [![progress-banner](https://backend.codecrafters.io/progress/git/1f907f09-a1fd-472d-8fa4-562374cef476)](https://app.codecrafters.io/users/plasmaDestroyer?r=2qF)
 
@@ -21,12 +21,12 @@ cmake -B build -S . && cmake --build ./build
 ./build/git hash-object -w <file>
 
 # alias for testing
-alias le-git=/path/to/le-git/your_program.sh
+alias legit=/path/to/legit/your_program.sh
 mkdir -p /tmp/testing && cd /tmp/testing
-le-git init
+legit init
 echo "hello world" > test.txt
-le-git hash-object -w test.txt
-le-git cat-file -p <sha>
+legit hash-object -w test.txt
+legit cat-file -p <sha>
 ```
 
 ## Testing locally
@@ -35,5 +35,5 @@ Run in a separate dir so you don't damage this repo's `.git`:
 
 ```sh
 mkdir -p /tmp/testing && cd /tmp/testing
-/path/to/le-git/your_program.sh init
+/path/to/legit/your_program.sh init
 ```
